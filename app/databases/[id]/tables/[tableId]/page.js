@@ -19,8 +19,8 @@ function ImageField({ value, onChange }) {
     const file = e.target.files?.[0];
     if (!file) return;
     setError("");
-    if (file.size > 2 * 1024 * 1024) {
-      setError("Máximo 2 MB");
+    if (file.size > 25 * 1024 * 1024) {
+      setError("Máximo 25 MB");
       e.target.value = "";
       return;
     }
@@ -35,7 +35,7 @@ function ImageField({ value, onChange }) {
         return;
       }
       onChange(data.filename);
-    } catch (err) {
+    } catch {
       setError("Error de red");
     } finally {
       setUploading(false);
@@ -44,6 +44,7 @@ function ImageField({ value, onChange }) {
   }
 
   const url = imageUrl(value);
+  const isLocal = value && !value.startsWith("http");
 
   return (
     <div className="flex items-start gap-3">
@@ -73,16 +74,30 @@ function ImageField({ value, onChange }) {
           {uploading ? "Subiendo..." : value ? "Cambiar" : "Subir imagen"}
         </button>
         {value && !uploading && (
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            className="text-xs text-red-600 hover:underline"
-          >
-            Quitar
-          </button>
+          <div className="flex gap-2">
+            {isLocal && (
+              <a
+                href={url}
+                download={value}
+                className="text-xs bg-green-100 hover:bg-green-200 text-green-800 border border-green-300 rounded px-2 py-1"
+                title="Descargar imagen"
+              >
+                ⬇ Descargar
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="text-xs text-red-600 hover:underline"
+            >
+              Quitar
+            </button>
+          </div>
         )}
         {error && <span className="text-xs text-red-600">{error}</span>}
-        <span className="text-xs text-gray-400">Máx 2 MB · JPG/PNG/WEBP/GIF</span>
+        <span className="text-xs text-gray-400">
+          Se reduce automáticamente para que pese ≤ 2 MB
+        </span>
       </div>
     </div>
   );
