@@ -1,0 +1,2 @@
+La aplicacion es tipo portdb que funciona en android, se empieza por definir la base de datos con su nombre, luego se agrega las tablas con sus campos y se pueden crear registros relacionados llamandosegun un registro de enlace. el programa original no tiene para sumar datos numericos,pero si para definir datos tipo fecha, combo, imagen, enlace, texto, etc. 
+Debe tenre la simpleza de crear tablas tal como portdb y debe estar preparado para ejecutarse en web inicialmente y en android y iphone en el futuro
