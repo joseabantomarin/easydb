@@ -9,15 +9,30 @@ const FIELD_TYPES = [
   { value: "memo", label: "Memo" },
   { value: "number", label: "Número" },
   { value: "decimal", label: "Decimal" },
+  { value: "boolean", label: "Sí/No" },
   { value: "date", label: "Fecha" },
   { value: "dropdown", label: "Desplegable" },
   { value: "image", label: "Imagen" },
   { value: "link", label: "Enlace" },
   { value: "detalle", label: "Detalle (sub-grilla)" },
+  { value: "formula", label: "Fórmula (=)" },
+  { value: "agregacion", label: "Agregación (SUM/AVG/…)" },
 ];
 
 function emptyField() {
-  return { name: "", type: "text", options: "", width: "", linkFieldId: "" };
+  return {
+    name: "",
+    type: "text",
+    options: "",
+    width: "",
+    linkFieldId: "",
+    // Para formula: f.options guarda la expresion; los decimals van en linkFieldId (reciclamos slot)
+    // Para agregacion: usamos extra fields
+    aggDetailField: "",
+    aggOperation: "SUM",
+    aggTargetField: "",
+    aggDecimals: "2",
+  };
 }
 
 function defaultWidth(type) {
@@ -25,7 +40,11 @@ function defaultWidth(type) {
     case "date":
     case "number":
     case "decimal":
+    case "formula":
+    case "agregacion":
       return 100;
+    case "boolean":
+      return 70;
     case "text":
     case "memo":
       return 300;
@@ -100,6 +119,10 @@ export default function DatabasePage({ params }) {
     const loaded = (data.fields || []).map((f) => {
       let optionsStr = "";
       let linkFieldId = "";
+      let aggDetailField = "";
+      let aggOperation = "SUM";
+      let aggTargetField = "";
+      let aggDecimals = "2";
       if (f.options) {
         try {
           const parsed = JSON.parse(f.options);
@@ -108,6 +131,14 @@ export default function DatabasePage({ params }) {
           else if (f.type === "detalle" && parsed && typeof parsed === "object") {
             optionsStr = String(parsed.table_id ?? "");
             linkFieldId = String(parsed.link_field_id ?? "");
+          } else if (f.type === "formula" && parsed && typeof parsed === "object") {
+            optionsStr = String(parsed.expr ?? "");
+            aggDecimals = String(parsed.decimals ?? "2");
+          } else if (f.type === "agregacion" && parsed && typeof parsed === "object") {
+            aggDetailField = String(parsed.detail_field_id ?? "");
+            aggOperation = String(parsed.operation ?? "SUM");
+            aggTargetField = String(parsed.target_field_id ?? "");
+            aggDecimals = String(parsed.decimals ?? "2");
           } else optionsStr = String(parsed);
         } catch {
           optionsStr = f.options;
@@ -120,12 +151,23 @@ export default function DatabasePage({ params }) {
         options: optionsStr,
         width: f.width != null ? String(f.width) : "",
         linkFieldId,
+        aggDetailField,
+        aggOperation,
+        aggTargetField,
+        aggDecimals,
       };
     });
     setFields(loaded);
     loaded
       .filter((f) => f.type === "detalle" && f.options)
       .forEach((f) => ensureTableFields(parseInt(f.options)));
+    // Para agregaciones: precargar fields del child table del detalle elegido
+    loaded
+      .filter((f) => f.type === "agregacion" && f.aggDetailField)
+      .forEach((f) => {
+        const detF = loaded.find((x) => String(x.id) === String(f.aggDetailField));
+        if (detF && detF.options) ensureTableFields(parseInt(detF.options));
+      });
     if (fields.length === 0) setFields([emptyField()]);
     setShowForm(true);
   }
@@ -235,6 +277,19 @@ export default function DatabasePage({ params }) {
       return;
     }
 
+    const badFormula = namedFields.find((f) => f.type === "formula" && !f.options?.trim());
+    if (badFormula) {
+      alert(`El campo "${badFormula.name}" (Fórmula) necesita una expresión, ej: [cantidad] * [precio]`);
+      return;
+    }
+    const badAgg = namedFields.find(
+      (f) => f.type === "agregacion" && (!f.aggDetailField || (f.aggOperation !== "COUNT" && !f.aggTargetField))
+    );
+    if (badAgg) {
+      alert(`El campo "${badAgg.name}" (Agregación) necesita: detalle, operación y, salvo COUNT, el campo a agregar.`);
+      return;
+    }
+
     const validFields = namedFields.map((f) => {
       const w = parseInt(f.width, 10);
       let options = null;
@@ -246,6 +301,18 @@ export default function DatabasePage({ params }) {
         options = { decimals: Math.max(0, parseInt(f.options || "2", 10) || 0) };
       } else if (f.type === "detalle") {
         options = { table_id: f.options, link_field_id: f.linkFieldId };
+      } else if (f.type === "formula") {
+        options = {
+          expr: f.options.trim(),
+          decimals: Math.max(0, parseInt(f.aggDecimals || "2", 10) || 0),
+        };
+      } else if (f.type === "agregacion") {
+        options = {
+          detail_field_id: parseInt(f.aggDetailField),
+          operation: f.aggOperation,
+          target_field_id: f.aggTargetField ? parseInt(f.aggTargetField) : null,
+          decimals: Math.max(0, parseInt(f.aggDecimals || "2", 10) || 0),
+        };
       }
       return {
         id: f.id,
@@ -372,6 +439,90 @@ export default function DatabasePage({ params }) {
                       ))}
                   </select>
                 )}
+                {field.type === "formula" && (
+                  <>
+                    <input
+                      type="text"
+                      value={field.options}
+                      onChange={(e) => updateField(i, "options", e.target.value)}
+                      placeholder="Ej: [cantidad] * [precio]"
+                      title="Usa [nombre_campo] para referenciar otros campos"
+                      className="flex-1 min-w-[180px] border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={field.aggDecimals || "2"}
+                      onChange={(e) => updateField(i, "aggDecimals", e.target.value)}
+                      title="Decimales del resultado"
+                      placeholder="Dec"
+                      className="w-20 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </>
+                )}
+                {field.type === "agregacion" && (() => {
+                  const detalleFields = fields.filter((x) => x.type === "detalle" && x.options);
+                  const chosenDet = detalleFields.find((d) => String(d.id) === String(field.aggDetailField));
+                  const childFields = chosenDet ? (tableFieldsCache[chosenDet.options] || []) : [];
+                  const numericChildFields = childFields.filter((cf) =>
+                    ["number", "decimal", "formula", "agregacion", "boolean"].includes(cf.type)
+                  );
+                  return (
+                    <>
+                      <select
+                        value={field.aggDetailField}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          updateField(i, "aggDetailField", v);
+                          updateField(i, "aggTargetField", "");
+                          const det = fields.find((x) => String(x.id) === String(v));
+                          if (det && det.options) ensureTableFields(parseInt(det.options));
+                        }}
+                        className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">— detalle —</option>
+                        {detalleFields.map((d) => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={field.aggOperation}
+                        onChange={(e) => updateField(i, "aggOperation", e.target.value)}
+                        className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="SUM">SUM</option>
+                        <option value="AVG">AVG</option>
+                        <option value="MIN">MIN</option>
+                        <option value="MAX">MAX</option>
+                        <option value="COUNT">COUNT</option>
+                      </select>
+                      {field.aggOperation !== "COUNT" && (
+                        <select
+                          value={field.aggTargetField}
+                          onChange={(e) => updateField(i, "aggTargetField", e.target.value)}
+                          disabled={!chosenDet}
+                          className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                        >
+                          <option value="">— campo hijo —</option>
+                          {numericChildFields.map((cf) => (
+                            <option key={cf.id} value={cf.id}>{cf.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      <input
+                        type="number"
+                        min="0"
+                        max="10"
+                        value={field.aggDecimals || "2"}
+                        onChange={(e) => updateField(i, "aggDecimals", e.target.value)}
+                        title="Decimales"
+                        placeholder="Dec"
+                        className="w-20 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </>
+                  );
+                })()}
                 {field.type === "detalle" && (
                   <>
                     <select
