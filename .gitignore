@@ -45,3 +45,6 @@ next-env.d.ts
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+
+# uploads
+/uploads/

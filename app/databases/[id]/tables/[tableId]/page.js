@@ -1,8 +1,92 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import Link from "next/link";
 import { EditIcon, TrashIcon } from "@/app/icons";
+
+function imageUrl(value) {
+  if (!value) return null;
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  return `/api/files/${value}`;
+}
+
+function ImageField({ value, onChange }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError("");
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Máximo 2 MB");
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Error al subir");
+        return;
+      }
+      onChange(data.filename);
+    } catch (err) {
+      setError("Error de red");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  const url = imageUrl(value);
+
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-[100px] h-[100px] border border-gray-300 rounded bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-xs text-gray-400">sin imagen</span>
+        )}
+      </div>
+      <div className="flex flex-col gap-2 items-start">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFile}
+          disabled={uploading}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {uploading ? "Subiendo..." : value ? "Cambiar" : "Subir imagen"}
+        </button>
+        {value && !uploading && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-xs text-red-600 hover:underline"
+          >
+            Quitar
+          </button>
+        )}
+        {error && <span className="text-xs text-red-600">{error}</span>}
+        <span className="text-xs text-gray-400">Máx 2 MB · JPG/PNG/WEBP/GIF</span>
+      </div>
+    </div>
+  );
+}
 
 export default function TablePage({ params }) {
   const { id, tableId } = use(params);
@@ -154,7 +238,12 @@ export default function TablePage({ params }) {
     if (field.type === "link") {
       return linkedLabel(field.id, value);
     }
-    if (field.type === "image") return value ? "Ver imagen" : "-";
+    if (field.type === "image") {
+      const url = imageUrl(value);
+      if (!url) return "-";
+      // eslint-disable-next-line @next/next/no-img-element
+      return <img src={url} alt="" className="w-12 h-12 object-cover rounded border border-gray-200" />;
+    }
     return value;
   }
 
@@ -753,15 +842,7 @@ export default function TablePage({ params }) {
         );
       }
       case "image":
-        return (
-          <input
-            type="url"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="URL de la imagen"
-            className={inputClass}
-          />
-        );
+        return <ImageField value={value} onChange={onChange} />;
       case "link": {
         const linked = linkedTables[field.id]?.records || [];
         return (
@@ -1073,7 +1154,7 @@ function ItemInput({ field, value, onChange, linkedTables, getDecimals }) {
       );
     }
     case "image":
-      return <input type="url" value={value} onChange={(e) => onChange(e.target.value)} placeholder="URL" className={cls} />;
+      return <ImageField value={value} onChange={onChange} />;
     case "link": {
       const linked = linkedTables[field.id]?.records || [];
       const linkedFields = linkedTables[field.id]?.fields || [];
