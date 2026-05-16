@@ -202,6 +202,8 @@ export default function TablePage({ params }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  // { [aggregationFieldId]: { [parentRecordId]: number } }
+  const [aggregations, setAggregations] = useState({});
 
   useEffect(() => {
     fetchData();
@@ -239,6 +241,56 @@ export default function TablePage({ params }) {
         [field.id]: { fields: data.fields || [], records: data.records || [] },
       }));
     }
+
+    await loadAggregations(tableData.fields || []);
+  }
+
+  async function loadAggregations(fieldsList) {
+    const aggFields = fieldsList.filter((f) => f.type === "agregacion" && f.options);
+    if (aggFields.length === 0) return;
+
+    const next = {};
+    for (const f of aggFields) {
+      let cfg;
+      try { cfg = JSON.parse(f.options); } catch { continue; }
+      const detField = fieldsList.find((x) => x.id === cfg.detail_field_id);
+      if (!detField || !detField.options) continue;
+      let detCfg;
+      try { detCfg = JSON.parse(detField.options); } catch { continue; }
+      const childTableId = parseInt(detCfg.table_id);
+      const linkFieldId = parseInt(detCfg.link_field_id);
+      if (!childTableId || !linkFieldId) continue;
+
+      const res = await fetch(`/api/records?table_id=${childTableId}`);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const byParent = {};
+      for (const cr of data.records || []) {
+        const pid = cr.values?.[linkFieldId];
+        if (pid === null || pid === undefined || pid === "") continue;
+        const k = String(parseInt(pid));
+        if (!byParent[k]) byParent[k] = [];
+        byParent[k].push(cr);
+      }
+
+      const perParent = {};
+      for (const [pid, kids] of Object.entries(byParent)) {
+        if (cfg.operation === "COUNT") {
+          perParent[pid] = kids.length;
+          continue;
+        }
+        const nums = kids
+          .map((k) => parseFloat(k.values?.[cfg.target_field_id]))
+          .filter((n) => Number.isFinite(n));
+        if (nums.length === 0) { perParent[pid] = 0; continue; }
+        if (cfg.operation === "SUM") perParent[pid] = nums.reduce((a, b) => a + b, 0);
+        else if (cfg.operation === "AVG") perParent[pid] = nums.reduce((a, b) => a + b, 0) / nums.length;
+        else if (cfg.operation === "MIN") perParent[pid] = Math.min(...nums);
+        else if (cfg.operation === "MAX") perParent[pid] = Math.max(...nums);
+      }
+      next[f.id] = perParent;
+    }
+    setAggregations(next);
   }
 
   function linkedLabel(fieldId, recordId) {
@@ -267,11 +319,19 @@ export default function TablePage({ params }) {
 
   async function saveRecord(e) {
     e.preventDefault();
+    // No enviar campos calculados (formula/agregacion) ni detalle
+    const computedTypes = new Set(["formula", "agregacion", "detalle"]);
+    const cleanValues = {};
+    for (const [fid, v] of Object.entries(formValues)) {
+      const f = allFields.find((x) => String(x.id) === String(fid));
+      if (!f || computedTypes.has(f.type)) continue;
+      cleanValues[fid] = v;
+    }
     if (editingRecordId) {
       await fetch(`/api/records/${editingRecordId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ values: formValues }),
+        body: JSON.stringify({ values: cleanValues }),
       });
       setShowForm(false);
       setEditingRecordId(null);
@@ -281,7 +341,7 @@ export default function TablePage({ params }) {
       const res = await fetch("/api/records", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ table_id: parseInt(tableId), values: formValues }),
+        body: JSON.stringify({ table_id: parseInt(tableId), values: cleanValues }),
       });
       const created = await res.json();
       await fetchData();
@@ -313,13 +373,74 @@ export default function TablePage({ params }) {
     }
   }
 
+  function evalFormula(expr, record) {
+    if (!expr) return null;
+    // Reemplaza [nombre_campo] por valor numerico del record
+    let body = expr.replace(/\[([^\]]+)\]/g, (_, name) => {
+      const f = fields.find((x) => x.name === name);
+      if (!f) return "0";
+      // Permitimos referenciar otros formula/agregacion/boolean
+      const v = cellNumericValue(f, record);
+      return Number.isFinite(v) ? String(v) : "0";
+    });
+    if (!/^[\d\s+\-*/().]+$/.test(body)) return null;
+    try {
+      // eslint-disable-next-line no-new-func
+      const result = Function(`return (${body})`)();
+      return Number.isFinite(result) ? result : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function cellNumericValue(field, record) {
+    if (field.type === "boolean") {
+      const raw = record.values?.[field.id];
+      return raw === "1" || raw === 1 ? 1 : 0;
+    }
+    if (field.type === "formula") {
+      try {
+        const cfg = JSON.parse(field.options || "{}");
+        const r = evalFormula(cfg.expr, record);
+        return r ?? NaN;
+      } catch { return NaN; }
+    }
+    if (field.type === "agregacion") {
+      return Number(aggregations[field.id]?.[String(record.id)] ?? NaN);
+    }
+    const v = record.values?.[field.id];
+    return parseFloat(v);
+  }
+
+  function aggregationDecimals(field) {
+    try {
+      const cfg = JSON.parse(field.options || "{}");
+      const n = parseInt(cfg.decimals, 10);
+      return Number.isFinite(n) && n >= 0 ? n : 2;
+    } catch { return 2; }
+  }
+
   function formatDecimal(value, decimals) {
     const n = parseFloat(value);
     if (!Number.isFinite(n)) return "-";
     return n.toLocaleString("es-PE", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   }
 
-  function getDisplayValue(field, value) {
+  function getDisplayValue(field, value, record) {
+    if (field.type === "boolean") {
+      return value === "1" || value === 1 ? "✓" : "—";
+    }
+    if (field.type === "formula") {
+      const cfg = (() => { try { return JSON.parse(field.options || "{}"); } catch { return {}; } })();
+      const result = record ? evalFormula(cfg.expr, record) : null;
+      if (result === null || !Number.isFinite(result)) return "-";
+      return formatDecimal(result, cfg.decimals ?? 2);
+    }
+    if (field.type === "agregacion") {
+      const v = record ? aggregations[field.id]?.[String(record.id)] : null;
+      if (v === null || v === undefined || !Number.isFinite(Number(v))) return "0";
+      return formatDecimal(v, aggregationDecimals(field));
+    }
     if (field.type === "decimal") {
       if (value === null || value === undefined || value === "") return "-";
       return formatDecimal(value, getDecimals(field));
@@ -351,7 +472,11 @@ export default function TablePage({ params }) {
       case "date":
       case "number":
       case "decimal":
+      case "formula":
+      case "agregacion":
         return "100px";
+      case "boolean":
+        return "70px";
       case "text":
       case "memo":
         return "300px";
@@ -365,7 +490,17 @@ export default function TablePage({ params }) {
     }
   }
 
-  function exportValue(field, value) {
+  function exportValue(field, value, record) {
+    if (field.type === "boolean") return value === "1" || value === 1 ? "Sí" : "No";
+    if (field.type === "formula" && record) {
+      const cfg = (() => { try { return JSON.parse(field.options || "{}"); } catch { return {}; } })();
+      const r = evalFormula(cfg.expr, record);
+      return r === null || !Number.isFinite(r) ? "" : String(r);
+    }
+    if (field.type === "agregacion" && record) {
+      const v = aggregations[field.id]?.[String(record.id)];
+      return v === null || v === undefined ? "0" : String(v);
+    }
     if (value === null || value === undefined || value === "") return "";
     if (field.type === "link") return linkedLabel(field.id, value);
     if (field.type === "decimal" || field.type === "number") {
@@ -387,7 +522,7 @@ export default function TablePage({ params }) {
     const rows = filteredRecords();
     const headers = fields.map((f) => csvCell(f.name));
     const data = rows.map((r) =>
-      fields.map((f) => csvCell(exportValue(f, r.values?.[f.id]))).join(";")
+      fields.map((f) => csvCell(exportValue(f, r.values?.[f.id], r))).join(";")
     );
     const csv = "﻿" + [headers.join(";"), ...data].join("\r\n");
 
@@ -404,14 +539,17 @@ export default function TablePage({ params }) {
     URL.revokeObjectURL(url);
   }
 
+  function isNumericColumn(f) {
+    return f.type === "decimal" || f.type === "formula" || f.type === "agregacion";
+  }
+
   function decimalSums(rows = records) {
     const sums = {};
     fields.forEach((f) => {
-      if (f.type !== "decimal") return;
+      if (!isNumericColumn(f)) return;
       let sum = 0;
       rows.forEach((r) => {
-        const v = r.values?.[f.id];
-        const n = parseFloat(v);
+        const n = cellNumericValue(f, r);
         if (Number.isFinite(n)) sum += n;
       });
       sums[f.id] = sum;
@@ -419,7 +557,29 @@ export default function TablePage({ params }) {
     return sums;
   }
 
+  function numericDecimals(field) {
+    if (field.type === "decimal") return getDecimals(field);
+    if (field.type === "formula") {
+      try { return JSON.parse(field.options || "{}").decimals ?? 2; } catch { return 2; }
+    }
+    if (field.type === "agregacion") return aggregationDecimals(field);
+    return 2;
+  }
+
   function searchableText(field, record) {
+    if (field.type === "boolean") {
+      const raw = record.values?.[field.id];
+      return raw === "1" || raw === 1 ? "si yes" : "no";
+    }
+    if (field.type === "formula") {
+      const cfg = (() => { try { return JSON.parse(field.options || "{}"); } catch { return {}; } })();
+      const r = evalFormula(cfg.expr, record);
+      return r === null ? "" : String(r);
+    }
+    if (field.type === "agregacion") {
+      const v = aggregations[field.id]?.[String(record.id)];
+      return v === null || v === undefined ? "" : String(v);
+    }
     const raw = record.values?.[field.id];
     if (raw === null || raw === undefined || raw === "") return "";
     if (field.type === "link") return linkedLabel(field.id, raw);
@@ -456,6 +616,18 @@ export default function TablePage({ params }) {
   }
 
   function compareForSort(field, a, b) {
+    // Tipos calculados/boolean: compara numericamente con cellNumericValue
+    if (field.type === "boolean" || field.type === "formula" || field.type === "agregacion") {
+      const na = cellNumericValue(field, a);
+      const nb = cellNumericValue(field, b);
+      const aE = !Number.isFinite(na);
+      const bE = !Number.isFinite(nb);
+      if (aE && bE) return 0;
+      if (aE) return 1;
+      if (bE) return -1;
+      return na - nb;
+    }
+
     const va = a.values?.[field.id];
     const vb = b.values?.[field.id];
     const ae = va === undefined || va === null || va === "";
@@ -627,7 +799,7 @@ export default function TablePage({ params }) {
     const pagedGroups = groups ? groups.slice(start, end) : null;
     const pagedRecords = groups ? null : filtered.slice(start, end);
     const grandSums = decimalSums(filtered);
-    const hasDecimals = fields.some((f) => f.type === "decimal");
+    const hasDecimals = fields.some((f) => isNumericColumn(f));
     const colCount = fields.length + 2;
 
     return (
@@ -766,9 +938,9 @@ export default function TablePage({ params }) {
                   {fields.map((field) => (
                     <td
                       key={field.id}
-                      className={`border border-gray-200 px-3 py-2 ${field.type === "decimal" ? "text-right font-mono text-blue-800" : ""}`}
+                      className={`border border-gray-200 px-3 py-2 ${isNumericColumn(field) ? "text-right font-mono text-blue-800" : ""}`}
                     >
-                      {field.type === "decimal" ? formatDecimal(grandSums[field.id], getDecimals(field)) : ""}
+                      {isNumericColumn(field) ? formatDecimal(grandSums[field.id], numericDecimals(field)) : ""}
                     </td>
                   ))}
                   <td className="border border-gray-200 px-3 py-2 sticky right-0 bg-blue-100 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)] z-10"></td>
@@ -813,14 +985,14 @@ export default function TablePage({ params }) {
       <tr key={record.id} className="group hover:bg-gray-50">
         <td className="border border-gray-200 px-3 py-2 text-gray-500">{num}</td>
         {fields.map((field) => {
-          const alignRight = field.type === "decimal" || field.type === "number";
+          const alignRight = isNumericColumn(field) || field.type === "number";
           const isMemo = field.type === "memo";
           return (
             <td
               key={field.id}
               className={`border border-gray-200 px-3 py-2 align-top ${alignRight ? "text-right font-mono" : ""} ${isMemo ? "whitespace-pre-wrap" : "truncate"}`}
             >
-              {getDisplayValue(field, record.values[field.id])}
+              {getDisplayValue(field, record.values[field.id], record)}
             </td>
           );
         })}
@@ -871,9 +1043,9 @@ export default function TablePage({ params }) {
             {fields.map((field) => (
               <td
                 key={field.id}
-                className={`border border-gray-200 px-3 py-2 ${field.type === "decimal" ? "text-right font-mono text-amber-800" : ""}`}
+                className={`border border-gray-200 px-3 py-2 ${isNumericColumn(field) ? "text-right font-mono text-amber-800" : ""}`}
               >
-                {field.type === "decimal" ? formatDecimal(g.sums[field.id], getDecimals(field)) : ""}
+                {isNumericColumn(field) ? formatDecimal(g.sums[field.id], numericDecimals(field)) : ""}
               </td>
             ))}
             <td className="border border-gray-200 px-3 py-2 sticky right-0 bg-amber-50 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)] z-10"></td>
@@ -889,6 +1061,40 @@ export default function TablePage({ params }) {
       "w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 
     switch (field.type) {
+      case "boolean":
+        return (
+          <label className="inline-flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={value === "1" || value === 1 || value === true}
+              onChange={(e) => onChange(e.target.checked ? "1" : "0")}
+              className="w-5 h-5 accent-blue-600"
+            />
+            <span className="text-sm text-gray-600">Sí</span>
+          </label>
+        );
+      case "formula": {
+        const cfg = (() => { try { return JSON.parse(field.options || "{}"); } catch { return {}; } })();
+        const result = evalFormula(cfg.expr, { id: editingRecordId, values: formValues });
+        const display = result === null || !Number.isFinite(result) ? "—" : formatDecimal(result, cfg.decimals ?? 2);
+        return (
+          <div className="bg-gray-100 border border-gray-300 rounded px-3 py-2 text-sm font-mono text-right text-gray-700">
+            {display}
+            <span className="text-xs text-gray-400 ml-2 font-sans">(calculado)</span>
+          </div>
+        );
+      }
+      case "agregacion": {
+        const v = editingRecordId ? aggregations[field.id]?.[String(editingRecordId)] : null;
+        const display = v === null || v === undefined ? (editingRecordId ? "0" : "—")
+          : formatDecimal(v, aggregationDecimals(field));
+        return (
+          <div className="bg-gray-100 border border-gray-300 rounded px-3 py-2 text-sm font-mono text-right text-gray-700">
+            {display}
+            <span className="text-xs text-gray-400 ml-2 font-sans">(calculado)</span>
+          </div>
+        );
+      }
       case "text":
         return (
           <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
@@ -1044,6 +1250,11 @@ function DetalleSubgrid({ detalleField, parentId }) {
   }
 
   function displayCell(field, value) {
+    if (field.type === "boolean") return value === "1" || value === 1 ? "✓" : "—";
+    if (field.type === "formula" || field.type === "agregacion") {
+      // En la sub-grilla no calculamos cross-table aquí; mostrar "—" si no hay valor
+      return "—";
+    }
     if (value === null || value === undefined || value === "") return "-";
     if (field.type === "decimal") return formatDecimal(value, getDecimals(field));
     if (field.type === "link") return linkedLabel(field.id, value);
@@ -1079,7 +1290,14 @@ function DetalleSubgrid({ detalleField, parentId }) {
 
   async function saveItem(e) {
     e.preventDefault();
-    const valuesWithLink = { ...itemValues, [linkFieldId]: String(parentId) };
+    const computedTypes = new Set(["formula", "agregacion", "detalle"]);
+    const cleanItemValues = {};
+    for (const [fid, v] of Object.entries(itemValues)) {
+      const f = childFields.find((x) => String(x.id) === String(fid));
+      if (!f || computedTypes.has(f.type)) continue;
+      cleanItemValues[fid] = v;
+    }
+    const valuesWithLink = { ...cleanItemValues, [linkFieldId]: String(parentId) };
     if (editingItemId) {
       await fetch(`/api/records/${editingItemId}`, {
         method: "PUT",
@@ -1246,6 +1464,25 @@ function DetalleSubgrid({ detalleField, parentId }) {
 function ItemInput({ field, value, onChange, linkedTables, getDecimals }) {
   const cls = "w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
   switch (field.type) {
+    case "boolean":
+      return (
+        <label className="inline-flex items-center gap-2 cursor-pointer py-1">
+          <input
+            type="checkbox"
+            checked={value === "1" || value === 1 || value === true}
+            onChange={(e) => onChange(e.target.checked ? "1" : "0")}
+            className="w-5 h-5 accent-blue-600"
+          />
+          <span className="text-sm text-gray-600">Sí</span>
+        </label>
+      );
+    case "formula":
+    case "agregacion":
+      return (
+        <div className="bg-gray-100 border border-gray-300 rounded px-2 py-1 text-sm text-gray-500 italic">
+          (calculado al guardar)
+        </div>
+      );
     case "text":
       return <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className={cls} />;
     case "memo":
