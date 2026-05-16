@@ -1,11 +1,15 @@
 import { getDb } from "@/lib/db";
+import { requireUserId, unauthorized, forbidden, userOwnsTable } from "@/lib/authz";
 
 export async function GET(request) {
+  const userId = await requireUserId();
+  if (!userId) return unauthorized();
   const { searchParams } = new URL(request.url);
   const tableId = searchParams.get("table_id");
   if (!tableId) {
     return Response.json({ error: "table_id es requerido" }, { status: 400 });
   }
+  if (!userOwnsTable(tableId, userId)) return forbidden();
 
   const db = getDb();
   const fields = db.prepare("SELECT * FROM fields WHERE table_id = ? ORDER BY position").all(tableId);
@@ -26,16 +30,15 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  const userId = await requireUserId();
+  if (!userId) return unauthorized();
   const { table_id, values } = await request.json();
   if (!table_id) {
     return Response.json({ error: "table_id es requerido" }, { status: 400 });
   }
+  if (!userOwnsTable(table_id, userId)) return forbidden();
 
   const db = getDb();
-  const tableExists = db.prepare("SELECT id FROM tables_ WHERE id = ?").get(table_id);
-  if (!tableExists) {
-    return Response.json({ error: "Tabla no encontrada" }, { status: 404 });
-  }
 
   const insertRecord = db.prepare("INSERT INTO records (table_id) VALUES (?)");
   const insertValue = db.prepare("INSERT INTO record_values (record_id, field_id, value) VALUES (?, ?, ?)");
