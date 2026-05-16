@@ -617,7 +617,7 @@ export default function DatabasePage({ params }) {
                     type="button"
                     onClick={() => moveField(i, -1)}
                     disabled={i === 0}
-                    className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500 px-2 py-1 rounded text-sm leading-none"
+                    className="text-gray-700 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-700 px-2.5 py-1 rounded text-xl font-bold leading-none"
                     title="Mover arriba"
                   >
                     ↑
@@ -626,7 +626,7 @@ export default function DatabasePage({ params }) {
                     type="button"
                     onClick={() => moveField(i, 1)}
                     disabled={i === fields.length - 1}
-                    className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500 px-2 py-1 rounded text-sm leading-none"
+                    className="text-gray-700 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-700 px-2.5 py-1 rounded text-xl font-bold leading-none"
                     title="Mover abajo"
                   >
                     ↓
@@ -635,7 +635,7 @@ export default function DatabasePage({ params }) {
                     <button
                       type="button"
                       onClick={() => removeField(i)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded text-sm"
+                      className="text-red-600 hover:text-red-800 hover:bg-red-50 px-2.5 py-1 rounded text-xl font-bold leading-none"
                       title="Eliminar campo"
                     >
                       &times;
