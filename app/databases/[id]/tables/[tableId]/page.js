@@ -11,7 +11,8 @@ function imageUrl(value) {
 }
 
 function ImageField({ value, onChange }) {
-  const inputRef = useRef(null);
+  const cameraRef = useRef(null);
+  const galleryRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
@@ -58,21 +59,43 @@ function ImageField({ value, onChange }) {
       </div>
       <div className="flex flex-col gap-2 items-start">
         <input
-          ref={inputRef}
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFile}
+          disabled={uploading}
+          className="hidden"
+        />
+        <input
+          ref={galleryRef}
           type="file"
           accept="image/*"
           onChange={handleFile}
           disabled={uploading}
           className="hidden"
         />
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {uploading ? "Subiendo..." : value ? "Cambiar" : "Subir imagen"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => cameraRef.current?.click()}
+            disabled={uploading}
+            className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50"
+            title="Tomar foto con la cámara"
+          >
+            📷 Cámara
+          </button>
+          <button
+            type="button"
+            onClick={() => galleryRef.current?.click()}
+            disabled={uploading}
+            className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1.5 rounded disabled:opacity-50"
+            title="Elegir desde galería o archivos"
+          >
+            🖼️ Galería
+          </button>
+        </div>
+        {uploading && <span className="text-xs text-gray-500">Subiendo…</span>}
         {value && !uploading && (
           <div className="flex gap-2">
             {isLocal && (
