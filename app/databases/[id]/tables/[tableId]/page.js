@@ -178,6 +178,45 @@ export default function TablePage({ params }) {
     }
   }
 
+  function exportValue(field, value) {
+    if (value === null || value === undefined || value === "") return "";
+    if (field.type === "link") return linkedLabel(field.id, value);
+    if (field.type === "decimal" || field.type === "number") {
+      const n = parseFloat(value);
+      return Number.isFinite(n) ? String(n) : "";
+    }
+    return String(value);
+  }
+
+  function csvCell(value) {
+    const s = value == null ? "" : String(value);
+    if (s.includes(";") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  }
+
+  function exportCSV() {
+    const rows = filteredRecords();
+    const headers = fields.map((f) => csvCell(f.name));
+    const data = rows.map((r) =>
+      fields.map((f) => csvCell(exportValue(f, r.values?.[f.id]))).join(";")
+    );
+    const csv = "﻿" + [headers.join(";"), ...data].join("\r\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+    const safeName = (table?.name || "tabla").replace(/[^a-z0-9_-]/gi, "_");
+    a.href = url;
+    a.download = `${safeName}_${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   function decimalSums(rows = records) {
     const sums = {};
     fields.forEach((f) => {
@@ -303,12 +342,24 @@ export default function TablePage({ params }) {
 
       <div className="flex flex-wrap gap-3 items-center justify-between mb-6">
         <h1 className="text-xl sm:text-2xl font-bold truncate">{table.name}</h1>
-        <button
-          onClick={openNewForm}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-        >
-          Nuevo Registro
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={exportCSV}
+            disabled={records.length === 0}
+            className="bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-green-800 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Exportar a Excel (CSV)"
+            aria-label="Exportar"
+          >
+            📥<span className="hidden sm:inline sm:ml-1">Exportar</span>
+          </button>
+          <button
+            onClick={openNewForm}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+          >
+            Nuevo Registro
+          </button>
+        </div>
       </div>
 
       {showForm && (

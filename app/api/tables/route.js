@@ -1,16 +1,15 @@
 import { getDb } from "@/lib/db";
+import { requireUserId, unauthorized, forbidden, userOwnsDatabase } from "@/lib/authz";
 
 export async function POST(request) {
+  const userId = await requireUserId();
+  if (!userId) return unauthorized();
   const { database_id, name, fields } = await request.json();
   if (!database_id || !name || !name.trim()) {
     return Response.json({ error: "database_id y name son requeridos" }, { status: 400 });
   }
+  if (!userOwnsDatabase(database_id, userId)) return forbidden();
   const db = getDb();
-
-  const dbExists = db.prepare("SELECT id FROM databases WHERE id = ?").get(database_id);
-  if (!dbExists) {
-    return Response.json({ error: "Base de datos no encontrada" }, { status: 404 });
-  }
 
   const insertTable = db.prepare("INSERT INTO tables_ (database_id, name) VALUES (?, ?)");
   const insertField = db.prepare(

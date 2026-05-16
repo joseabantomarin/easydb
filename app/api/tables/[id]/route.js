@@ -1,7 +1,12 @@
 import { getDb } from "@/lib/db";
+import { requireUserId, unauthorized, forbidden, userOwnsTable } from "@/lib/authz";
 
 export async function GET(request, { params }) {
+  const userId = await requireUserId();
+  if (!userId) return unauthorized();
   const { id } = await params;
+  if (!userOwnsTable(id, userId)) return forbidden();
+
   const db = getDb();
   const table = db.prepare("SELECT * FROM tables_ WHERE id = ?").get(id);
   if (!table) {
@@ -12,7 +17,10 @@ export async function GET(request, { params }) {
 }
 
 export async function PUT(request, { params }) {
+  const userId = await requireUserId();
+  if (!userId) return unauthorized();
   const { id } = await params;
+  if (!userOwnsTable(id, userId)) return forbidden();
   const { name, fields } = await request.json();
   const db = getDb();
 
@@ -63,11 +71,11 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  const userId = await requireUserId();
+  if (!userId) return unauthorized();
   const { id } = await params;
+  if (!userOwnsTable(id, userId)) return forbidden();
   const db = getDb();
-  const result = db.prepare("DELETE FROM tables_ WHERE id = ?").run(id);
-  if (result.changes === 0) {
-    return Response.json({ error: "Tabla no encontrada" }, { status: 404 });
-  }
+  db.prepare("DELETE FROM tables_ WHERE id = ?").run(id);
   return Response.json({ ok: true });
 }

@@ -1,14 +1,13 @@
 import { getDb } from "@/lib/db";
+import { requireUserId, unauthorized, forbidden, userOwnsRecord } from "@/lib/authz";
 
 export async function PUT(request, { params }) {
+  const userId = await requireUserId();
+  if (!userId) return unauthorized();
   const { id } = await params;
+  if (!userOwnsRecord(id, userId)) return forbidden();
   const { values } = await request.json();
   const db = getDb();
-
-  const record = db.prepare("SELECT * FROM records WHERE id = ?").get(id);
-  if (!record) {
-    return Response.json({ error: "Registro no encontrado" }, { status: 404 });
-  }
 
   const transaction = db.transaction(() => {
     if (values && typeof values === "object") {
@@ -27,11 +26,11 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  const userId = await requireUserId();
+  if (!userId) return unauthorized();
   const { id } = await params;
+  if (!userOwnsRecord(id, userId)) return forbidden();
   const db = getDb();
-  const result = db.prepare("DELETE FROM records WHERE id = ?").run(id);
-  if (result.changes === 0) {
-    return Response.json({ error: "Registro no encontrado" }, { status: 404 });
-  }
+  db.prepare("DELETE FROM records WHERE id = ?").run(id);
   return Response.json({ ok: true });
 }
