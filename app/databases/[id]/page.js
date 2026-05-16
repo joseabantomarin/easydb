@@ -180,6 +180,16 @@ export default function DatabasePage({ params }) {
     setFields(fields.filter((_, i) => i !== index));
   }
 
+  function moveField(index, direction) {
+    setFields((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   function updateField(index, key, value) {
     setFields((prev) => {
       const updated = [...prev];
@@ -602,16 +612,36 @@ export default function DatabasePage({ params }) {
                   title="Ancho en px (vacío = por defecto)"
                   className="w-32 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {fields.length > 1 && (
+                <div className="flex items-center gap-0.5 ml-auto">
                   <button
                     type="button"
-                    onClick={() => removeField(i)}
-                    className="text-red-500 hover:text-red-700 px-2 py-2"
-                    title="Eliminar campo"
+                    onClick={() => moveField(i, -1)}
+                    disabled={i === 0}
+                    className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500 px-2 py-1 rounded text-sm leading-none"
+                    title="Mover arriba"
                   >
-                    &times;
+                    ↑
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => moveField(i, 1)}
+                    disabled={i === fields.length - 1}
+                    className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500 px-2 py-1 rounded text-sm leading-none"
+                    title="Mover abajo"
+                  >
+                    ↓
+                  </button>
+                  {fields.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeField(i)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded text-sm"
+                      title="Eliminar campo"
+                    >
+                      &times;
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             <button
