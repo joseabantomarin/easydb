@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, use, useRef } from "react";
+import { useState, useEffect, use, useRef, createContext, useContext } from "react";
 import Link from "next/link";
 import { EditIcon, TrashIcon } from "@/app/icons";
+
+const LightboxContext = createContext({ open: () => {} });
 
 function imageUrl(value) {
   if (!value) return null;
@@ -10,11 +12,56 @@ function imageUrl(value) {
   return `/api/files/${value}`;
 }
 
+function Lightbox({ url, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 cursor-zoom-out"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt=""
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-full max-h-full cursor-default"
+      />
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-3 right-3 text-white text-3xl bg-black/40 hover:bg-black/60 rounded-full w-11 h-11 flex items-center justify-center"
+        aria-label="Cerrar"
+      >
+        ×
+      </button>
+      <a
+        href={url}
+        download
+        onClick={(e) => e.stopPropagation()}
+        className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white bg-black/40 hover:bg-black/60 rounded-full px-4 py-2 text-sm"
+        title="Descargar"
+      >
+        ⬇ Descargar
+      </a>
+    </div>
+  );
+}
+
 function ImageField({ value, onChange }) {
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const { open: openLightbox } = useContext(LightboxContext);
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
@@ -49,7 +96,11 @@ function ImageField({ value, onChange }) {
 
   return (
     <div className="flex items-start gap-3">
-      <div className="w-[100px] h-[100px] border border-gray-300 rounded bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+      <div
+        onClick={url ? () => openLightbox(url) : undefined}
+        className={`w-[100px] h-[100px] border border-gray-300 rounded bg-gray-50 flex items-center justify-center overflow-hidden shrink-0 ${url ? "cursor-zoom-in" : ""}`}
+        title={url ? "Click para ampliar" : ""}
+      >
         {url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt="" className="w-full h-full object-cover" />
@@ -150,6 +201,7 @@ export default function TablePage({ params }) {
   const [sortDir, setSortDir] = useState("asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -280,7 +332,15 @@ export default function TablePage({ params }) {
       const url = imageUrl(value);
       if (!url) return "-";
       // eslint-disable-next-line @next/next/no-img-element
-      return <img src={url} alt="" className="w-12 h-12 object-cover rounded border border-gray-200" />;
+      return (
+        <img
+          src={url}
+          alt=""
+          onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }}
+          className="w-12 h-12 object-cover rounded border border-gray-200 cursor-zoom-in"
+          title="Click para ampliar"
+        />
+      );
     }
     return value;
   }
@@ -460,7 +520,9 @@ export default function TablePage({ params }) {
   if (!table) return <p className="text-red-500">Tabla no encontrada.</p>;
 
   return (
+    <LightboxContext.Provider value={{ open: setLightboxUrl }}>
     <div>
+      {lightboxUrl && <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
       <div className="mb-6">
         <Link href={`/databases/${id}`} className="text-blue-600 hover:underline text-sm">
           &larr; Volver a tablas
@@ -550,6 +612,7 @@ export default function TablePage({ params }) {
         )
       )}
     </div>
+    </LightboxContext.Provider>
   );
 
   function renderGrid() {
@@ -903,6 +966,7 @@ export default function TablePage({ params }) {
 }
 
 function DetalleSubgrid({ detalleField, parentId }) {
+  const { open: openLightbox } = useContext(LightboxContext);
   const cfg = (() => {
     try { return JSON.parse(detalleField.options || "{}"); } catch { return {}; }
   })();
@@ -983,7 +1047,20 @@ function DetalleSubgrid({ detalleField, parentId }) {
     if (value === null || value === undefined || value === "") return "-";
     if (field.type === "decimal") return formatDecimal(value, getDecimals(field));
     if (field.type === "link") return linkedLabel(field.id, value);
-    if (field.type === "image") return "(img)";
+    if (field.type === "image") {
+      const url = imageUrl(value);
+      if (!url) return "-";
+      // eslint-disable-next-line @next/next/no-img-element
+      return (
+        <img
+          src={url}
+          alt=""
+          onClick={() => openLightbox(url)}
+          className="w-10 h-10 object-cover rounded cursor-zoom-in"
+          title="Click para ampliar"
+        />
+      );
+    }
     return String(value);
   }
 
