@@ -1,65 +1,149 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { EditIcon, TrashIcon } from "@/app/icons";
 
 export default function Home() {
+  const [databases, setDatabases] = useState([]);
+  const [newName, setNewName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
+
+  useEffect(() => {
+    fetchDatabases();
+  }, []);
+
+  async function fetchDatabases() {
+    const res = await fetch("/api/databases");
+    const data = await res.json();
+    setDatabases(data);
+    setLoading(false);
+  }
+
+  async function createDatabase(e) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    await fetch("/api/databases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+    setNewName("");
+    fetchDatabases();
+  }
+
+  async function deleteDatabase(id) {
+    if (!confirm("¿Eliminar esta base de datos y todos sus datos?")) return;
+    await fetch(`/api/databases/${id}`, { method: "DELETE" });
+    fetchDatabases();
+  }
+
+  async function saveEdit(id) {
+    if (!editName.trim()) return;
+    await fetch(`/api/databases/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editName.trim() }),
+    });
+    setEditingId(null);
+    fetchDatabases();
+  }
+
+  if (loading) {
+    return <p className="text-gray-500">Cargando...</p>;
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Mis Bases de Datos</h1>
+
+      <form onSubmit={createDatabase} className="flex gap-3 mb-8">
+        <input
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="Nombre de la nueva base de datos"
+          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+        >
+          Crear
+        </button>
+      </form>
+
+      {databases.length === 0 ? (
+        <p className="text-gray-500 text-center py-12">
+          No hay bases de datos. Crea una para empezar.
+        </p>
+      ) : (
+        <div className="grid gap-4">
+          {databases.map((db) => (
+            <div
+              key={db.id}
+              className="border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:shadow transition"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              {editingId === db.id ? (
+                <div className="flex gap-2 flex-1 mr-4">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && saveEdit(db.id)}
+                    className="flex-1 border border-gray-300 rounded px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => saveEdit(db.id)}
+                    className="text-green-600 hover:text-green-800 font-medium"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    onClick={() => setEditingId(null)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href={`/databases/${db.id}`}
+                  className="text-lg font-medium text-blue-600 hover:underline flex-1"
+                >
+                  {db.name}
+                </Link>
+              )}
+              {editingId !== db.id && (
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => {
+                      setEditingId(db.id);
+                      setEditName(db.name);
+                    }}
+                    className="text-gray-500 hover:text-blue-600 p-2 rounded hover:bg-blue-50"
+                    title="Editar"
+                    aria-label="Editar"
+                  >
+                    <EditIcon />
+                  </button>
+                  <button
+                    onClick={() => deleteDatabase(db.id)}
+                    className="text-gray-500 hover:text-red-600 p-2 rounded hover:bg-red-50"
+                    title="Eliminar"
+                    aria-label="Eliminar"
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      )}
     </div>
   );
 }
