@@ -57,7 +57,6 @@ function Lightbox({ url, onClose }) {
 }
 
 function ImageField({ value, onChange }) {
-  const cameraRef = useRef(null);
   const galleryRef = useRef(null);
   const filesRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -111,15 +110,6 @@ function ImageField({ value, onChange }) {
       </div>
       <div className="flex flex-col gap-2 items-start">
         <input
-          ref={cameraRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={handleFile}
-          disabled={uploading}
-          className="hidden"
-        />
-        <input
           ref={galleryRef}
           type="file"
           accept="image/*"
@@ -137,18 +127,9 @@ function ImageField({ value, onChange }) {
         <div className="flex gap-2 flex-wrap">
           <button
             type="button"
-            onClick={() => cameraRef.current?.click()}
-            disabled={uploading}
-            className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50"
-            title="Tomar foto con la cámara"
-          >
-            📷 Cámara
-          </button>
-          <button
-            type="button"
             onClick={() => galleryRef.current?.click()}
             disabled={uploading}
-            className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1.5 rounded disabled:opacity-50"
+            className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50"
             title="Elegir desde galería de fotos"
           >
             🖼️ Galería
@@ -158,7 +139,7 @@ function ImageField({ value, onChange }) {
             onClick={() => filesRef.current?.click()}
             disabled={uploading}
             className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1.5 rounded disabled:opacity-50"
-            title="Explorador de archivos (incluye capturas no sincronizadas)"
+            title="Explorador de archivos (incluye cámara y capturas)"
           >
             📁 Archivos
           </button>
