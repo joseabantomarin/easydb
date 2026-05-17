@@ -202,6 +202,7 @@ export default function TablePage({ params }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [selectedRecordId, setSelectedRecordId] = useState(null);
   // { [aggregationFieldId]: { [parentRecordId]: number } }
   const [aggregations, setAggregations] = useState({});
 
@@ -211,6 +212,7 @@ export default function TablePage({ params }) {
 
   useEffect(() => {
     setPage(1);
+    setSelectedRecordId(null);
   }, [search, groupBy, groupMode, dateFrom, dateTo, pageSize]);
 
   useEffect(() => {
@@ -703,7 +705,42 @@ export default function TablePage({ params }) {
 
       <div className="flex flex-wrap gap-3 items-center justify-between mb-6">
         <h1 className="text-xl sm:text-2xl font-bold truncate">{table.name}</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {selectedRecordId && (() => {
+            const sel = records.find((r) => r.id === selectedRecordId);
+            if (!sel) return null;
+            return (
+              <>
+                <button
+                  type="button"
+                  onClick={() => openEditForm(sel)}
+                  className="flex items-center gap-1 bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 px-3 py-2 rounded-lg"
+                  title="Editar fila seleccionada"
+                  aria-label="Editar"
+                >
+                  <EditIcon /><span className="hidden sm:inline text-sm">Editar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteRecord(sel.id)}
+                  className="flex items-center gap-1 bg-red-100 text-red-700 border border-red-300 hover:bg-red-200 px-3 py-2 rounded-lg"
+                  title="Eliminar fila seleccionada"
+                  aria-label="Eliminar"
+                >
+                  <TrashIcon /><span className="hidden sm:inline text-sm">Eliminar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRecordId(null)}
+                  className="text-gray-500 hover:text-gray-700 px-2 py-2 text-sm"
+                  title="Quitar selección"
+                >
+                  ×
+                </button>
+                <span className="w-px h-6 bg-gray-300 mx-1" />
+              </>
+            );
+          })()}
           <button
             type="button"
             onClick={exportCSV}
@@ -800,7 +837,7 @@ export default function TablePage({ params }) {
     const pagedRecords = groups ? null : filtered.slice(start, end);
     const grandSums = decimalSums(filtered);
     const hasDecimals = fields.some((f) => isNumericColumn(f));
-    const colCount = fields.length + 2;
+    const colCount = fields.length + 1;
 
     return (
       <>
@@ -895,7 +932,6 @@ export default function TablePage({ params }) {
               {fields.map((f) => (
                 <col key={f.id} style={{ width: columnWidth(f) }} />
               ))}
-              <col style={{ width: "80px" }} />
             </colgroup>
             <thead>
               <tr className="bg-gray-100">
@@ -914,9 +950,6 @@ export default function TablePage({ params }) {
                     </th>
                   );
                 })}
-                <th className="border border-gray-200 px-2 py-2 text-center sticky right-0 bg-gray-100 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)] z-10">
-
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -943,7 +976,6 @@ export default function TablePage({ params }) {
                       {isNumericColumn(field) ? formatDecimal(grandSums[field.id], numericDecimals(field)) : ""}
                     </td>
                   ))}
-                  <td className="border border-gray-200 px-3 py-2 sticky right-0 bg-blue-100 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)] z-10"></td>
                 </tr>
               </tfoot>
             )}
@@ -981,9 +1013,14 @@ export default function TablePage({ params }) {
   }
 
   function renderRow(record, num) {
+    const selected = selectedRecordId === record.id;
     return (
-      <tr key={record.id} className="group hover:bg-gray-50">
-        <td className="border border-gray-200 px-3 py-2 text-gray-500">{num}</td>
+      <tr
+        key={record.id}
+        onClick={() => setSelectedRecordId((cur) => (cur === record.id ? null : record.id))}
+        className={`cursor-pointer ${selected ? "bg-blue-100 hover:bg-blue-100" : "hover:bg-gray-50"}`}
+      >
+        <td className={`border border-gray-200 px-3 py-2 ${selected ? "text-blue-700 font-semibold" : "text-gray-500"}`}>{num}</td>
         {fields.map((field) => {
           const alignRight = isNumericColumn(field) || field.type === "number";
           const isMemo = field.type === "memo";
@@ -996,32 +1033,12 @@ export default function TablePage({ params }) {
             </td>
           );
         })}
-        <td className="border border-gray-200 px-2 py-1 sticky right-0 bg-white group-hover:bg-gray-50 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)] z-10">
-          <div className="flex gap-1 justify-center">
-            <button
-              onClick={() => openEditForm(record)}
-              className="text-gray-500 hover:text-blue-600 p-1.5 rounded hover:bg-blue-50"
-              title="Editar"
-              aria-label="Editar"
-            >
-              <EditIcon />
-            </button>
-            <button
-              onClick={() => deleteRecord(record.id)}
-              className="text-gray-500 hover:text-red-600 p-1.5 rounded hover:bg-red-50"
-              title="Eliminar"
-              aria-label="Eliminar"
-            >
-              <TrashIcon />
-            </button>
-          </div>
-        </td>
       </tr>
     );
   }
 
   function renderGroupedRows(groups, groupField) {
-    const colCount = fields.length + 2;
+    const colCount = fields.length + 1;
     const rows = [];
     let n = 0;
     for (const g of groups) {
@@ -1048,7 +1065,6 @@ export default function TablePage({ params }) {
                 {isNumericColumn(field) ? formatDecimal(g.sums[field.id], numericDecimals(field)) : ""}
               </td>
             ))}
-            <td className="border border-gray-200 px-3 py-2 sticky right-0 bg-amber-50 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)] z-10"></td>
           </tr>
         );
       }
