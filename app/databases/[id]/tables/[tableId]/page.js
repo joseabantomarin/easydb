@@ -907,7 +907,7 @@ export default function TablePage({ params }) {
                     <th
                       key={field.id}
                       onClick={() => toggleSort(field.id)}
-                      className={`border border-gray-200 px-3 py-2 text-left truncate cursor-pointer select-none hover:bg-gray-200 ${active ? "text-blue-700" : ""}`}
+                      className={`border border-gray-200 px-3 py-2 text-left break-words cursor-pointer select-none hover:bg-gray-200 ${active ? "text-blue-700" : ""}`}
                       title="Click para ordenar"
                     >
                       {field.name}<span className="text-xs">{arrow}</span>
@@ -990,7 +990,7 @@ export default function TablePage({ params }) {
           return (
             <td
               key={field.id}
-              className={`border border-gray-200 px-3 py-2 align-top ${alignRight ? "text-right font-mono" : ""} ${isMemo ? "whitespace-pre-wrap" : "truncate"}`}
+              className={`border border-gray-200 px-3 py-2 align-top break-words ${alignRight ? "text-right font-mono" : ""} ${isMemo ? "whitespace-pre-wrap" : "whitespace-normal"}`}
             >
               {getDisplayValue(field, record.values[field.id], record)}
             </td>
