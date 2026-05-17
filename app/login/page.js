@@ -38,6 +38,15 @@ export default async function LoginPage({ searchParams }) {
         <p className="text-xs text-gray-400 mt-6">
           Al iniciar sesión aceptas que EasyDB almacene tu nombre, correo y avatar para identificarte.
         </p>
+
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <a
+            href="/manual"
+            className="inline-block text-sm text-blue-600 hover:underline"
+          >
+            📖 ¿Cómo usarlo? Ver el manual
+          </a>
+        </div>
       </div>
     </div>
   );

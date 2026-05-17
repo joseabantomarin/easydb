@@ -57,7 +57,15 @@ export default function Home() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Mis Bases de Datos</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <h1 className="text-2xl font-bold">Mis Bases de Datos</h1>
+        <Link
+          href="/manual"
+          className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 px-3 py-1.5 rounded"
+        >
+          📖 Cómo usarlo
+        </Link>
+      </div>
 
       <form onSubmit={createDatabase} className="flex gap-3 mb-8">
         <input
