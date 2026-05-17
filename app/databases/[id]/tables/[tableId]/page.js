@@ -59,6 +59,7 @@ function Lightbox({ url, onClose }) {
 function ImageField({ value, onChange }) {
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
+  const filesRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const { open: openLightbox } = useContext(LightboxContext);
@@ -126,7 +127,14 @@ function ImageField({ value, onChange }) {
           disabled={uploading}
           className="hidden"
         />
-        <div className="flex gap-2">
+        <input
+          ref={filesRef}
+          type="file"
+          onChange={handleFile}
+          disabled={uploading}
+          className="hidden"
+        />
+        <div className="flex gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => cameraRef.current?.click()}
@@ -141,9 +149,18 @@ function ImageField({ value, onChange }) {
             onClick={() => galleryRef.current?.click()}
             disabled={uploading}
             className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1.5 rounded disabled:opacity-50"
-            title="Elegir desde galería o archivos"
+            title="Elegir desde galería de fotos"
           >
             🖼️ Galería
+          </button>
+          <button
+            type="button"
+            onClick={() => filesRef.current?.click()}
+            disabled={uploading}
+            className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1.5 rounded disabled:opacity-50"
+            title="Explorador de archivos (incluye capturas no sincronizadas)"
+          >
+            📁 Archivos
           </button>
         </div>
         {uploading && <span className="text-xs text-gray-500">Subiendo…</span>}
