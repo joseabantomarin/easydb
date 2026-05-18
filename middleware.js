@@ -11,6 +11,14 @@ export default auth((req) => {
   const isPublic = PUBLIC_PATHS.some((p) => nextUrl.pathname.startsWith(p));
   if (isPublic) return NextResponse.next();
 
+  // Allow Bearer-token authenticated API requests through; the route handler
+  // (via requireUserId) is responsible for verifying the token itself.
+  const authHeader = req.headers.get("authorization");
+  const hasBearer = authHeader && authHeader.toLowerCase().startsWith("bearer ");
+  if (hasBearer && nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
   if (!req.auth) {
     if (nextUrl.pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
