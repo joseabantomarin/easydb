@@ -1263,10 +1263,46 @@ function DetalleSubgrid({ detalleField, parentId }) {
     return n.toLocaleString("es-PE", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   }
 
-  function displayCell(field, value) {
+  function childCellNumeric(field, item) {
+    if (field.type === "boolean") {
+      const raw = item.values?.[field.id];
+      return raw === "1" || raw === 1 ? 1 : 0;
+    }
+    if (field.type === "formula") {
+      try {
+        const c = JSON.parse(field.options || "{}");
+        const r = evalChildFormula(c.expr, item);
+        return r ?? NaN;
+      } catch { return NaN; }
+    }
+    return parseFloat(item.values?.[field.id]);
+  }
+
+  function evalChildFormula(expr, item) {
+    if (!expr) return null;
+    let body = expr.replace(/\[([^\]]+)\]/g, (_, name) => {
+      const f = childFields.find((x) => x.name === name);
+      if (!f) return "0";
+      const v = childCellNumeric(f, item);
+      return Number.isFinite(v) ? String(v) : "0";
+    });
+    if (!/^[\d\s+\-*/().]+$/.test(body)) return null;
+    try {
+      // eslint-disable-next-line no-new-func
+      const result = Function(`return (${body})`)();
+      return Number.isFinite(result) ? result : null;
+    } catch { return null; }
+  }
+
+  function displayCell(field, value, item) {
     if (field.type === "boolean") return value === "1" || value === 1 ? "✓" : "—";
-    if (field.type === "formula" || field.type === "agregacion") {
-      // En la sub-grilla no calculamos cross-table aquí; mostrar "—" si no hay valor
+    if (field.type === "formula") {
+      const c = (() => { try { return JSON.parse(field.options || "{}"); } catch { return {}; } })();
+      const r = item ? evalChildFormula(c.expr, item) : null;
+      if (r === null || !Number.isFinite(r)) return "-";
+      return formatDecimal(r, c.decimals ?? 2);
+    }
+    if (field.type === "agregacion") {
       return "—";
     }
     if (value === null || value === undefined || value === "") return "-";
@@ -1442,8 +1478,8 @@ function DetalleSubgrid({ detalleField, parentId }) {
                 <tr key={it.id} className="hover:bg-gray-50">
                   <td className="border border-gray-200 px-2 py-1 text-gray-500">{i + 1}</td>
                   {visibleFields.map((f) => (
-                    <td key={f.id} className={`border border-gray-200 px-2 py-1 ${f.type === "decimal" || f.type === "number" ? "text-right font-mono" : ""}`}>
-                      {displayCell(f, it.values?.[f.id])}
+                    <td key={f.id} className={`border border-gray-200 px-2 py-1 ${f.type === "decimal" || f.type === "number" || f.type === "formula" ? "text-right font-mono" : ""}`}>
+                      {displayCell(f, it.values?.[f.id], it)}
                     </td>
                   ))}
                   <td className="border border-gray-200 px-1 py-1">
