@@ -10,9 +10,13 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
+  const [templates, setTemplates] = useState([]);
+  const [templateId, setTemplateId] = useState("");
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
 
   useEffect(() => {
     fetchDatabases();
+    fetchTemplates();
   }, []);
 
   async function fetchDatabases() {
@@ -20,6 +24,34 @@ export default function Home() {
     const data = await res.json();
     setDatabases(data);
     setLoading(false);
+  }
+
+  async function fetchTemplates() {
+    const res = await fetch("/api/templates");
+    if (!res.ok) return;
+    const data = await res.json();
+    setTemplates(data);
+  }
+
+  async function createFromTemplate() {
+    if (!templateId) return;
+    setCreatingTemplate(true);
+    try {
+      const res = await fetch("/api/databases/from-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template_id: templateId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "No se pudo crear desde la plantilla");
+        return;
+      }
+      setTemplateId("");
+      fetchDatabases();
+    } finally {
+      setCreatingTemplate(false);
+    }
   }
 
   async function createDatabase(e) {
@@ -67,7 +99,7 @@ export default function Home() {
         </Link>
       </div>
 
-      <form onSubmit={createDatabase} className="flex gap-3 mb-8">
+      <form onSubmit={createDatabase} className="flex gap-3 mb-3">
         <input
           type="text"
           value={newName}
@@ -82,6 +114,32 @@ export default function Home() {
           Crear
         </button>
       </form>
+
+      {templates.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 mb-8">
+          <span className="text-sm text-gray-600">…o usa una plantilla:</span>
+          <select
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            className="flex-1 min-w-[200px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">— elige una plantilla —</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id} title={t.description}>
+                {t.name} — {t.description}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={createFromTemplate}
+            disabled={!templateId || creatingTemplate}
+            className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {creatingTemplate ? "Creando…" : "Crear"}
+          </button>
+        </div>
+      )}
 
       {databases.length === 0 ? (
         <p className="text-gray-500 text-center py-12">
