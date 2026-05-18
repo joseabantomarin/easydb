@@ -30,7 +30,7 @@ export default function RootLayout({ children }) {
             <a href="/" className="flex items-center">
               <Image src="/logo-white.png" alt="EasyDB" width={154} height={122} className="h-12 sm:h-14 w-auto" priority />
             </a>
-            <p className="text-lg sm:text-xl text-blue-100 italic leading-tight">Una agenda con superpoderes</p>
+            <p className="text-sm sm:text-base text-blue-100 italic leading-tight">Una agenda con superpoderes</p>
           </div>
           <HeaderUser />
         </header>
