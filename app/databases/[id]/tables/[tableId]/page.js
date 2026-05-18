@@ -264,6 +264,53 @@ export default function TablePage({ params }) {
       const res = await fetch(`/api/records?table_id=${childTableId}`);
       if (!res.ok) continue;
       const data = await res.json();
+      const childFields = data.fields || [];
+      const targetField = childFields.find((x) => x.id === cfg.target_field_id);
+
+      const evalChildExpr = (expr, item) => {
+        if (!expr) return NaN;
+        const numFor = (fld) => {
+          if (fld.type === "boolean") {
+            const raw = item.values?.[fld.id];
+            return raw === "1" || raw === 1 ? 1 : 0;
+          }
+          if (fld.type === "formula") {
+            try {
+              const c = JSON.parse(fld.options || "{}");
+              return evalChildExpr(c.expr, item);
+            } catch { return NaN; }
+          }
+          return parseFloat(item.values?.[fld.id]);
+        };
+        let body = expr.replace(/\[([^\]]+)\]/g, (_, name) => {
+          const fld = childFields.find((x) => x.name === name);
+          if (!fld) return "0";
+          const v = numFor(fld);
+          return Number.isFinite(v) ? String(v) : "0";
+        });
+        if (!/^[\d\s+\-*/().]+$/.test(body)) return NaN;
+        try {
+          // eslint-disable-next-line no-new-func
+          const r = Function(`return (${body})`)();
+          return Number.isFinite(r) ? r : NaN;
+        } catch { return NaN; }
+      };
+
+      const numericValueFor = (item) => {
+        if (!targetField) return parseFloat(item.values?.[cfg.target_field_id]);
+        if (targetField.type === "formula") {
+          try {
+            const c = JSON.parse(targetField.options || "{}");
+            return evalChildExpr(c.expr, item);
+          } catch { return NaN; }
+        }
+        if (targetField.type === "boolean") {
+          const raw = item.values?.[targetField.id];
+          return raw === "1" || raw === 1 ? 1 : 0;
+        }
+        return parseFloat(item.values?.[targetField.id]);
+      };
+
       const byParent = {};
       for (const cr of data.records || []) {
         const pid = cr.values?.[linkFieldId];
@@ -279,9 +326,7 @@ export default function TablePage({ params }) {
           perParent[pid] = kids.length;
           continue;
         }
-        const nums = kids
-          .map((k) => parseFloat(k.values?.[cfg.target_field_id]))
-          .filter((n) => Number.isFinite(n));
+        const nums = kids.map(numericValueFor).filter((n) => Number.isFinite(n));
         if (nums.length === 0) { perParent[pid] = 0; continue; }
         if (cfg.operation === "SUM") perParent[pid] = nums.reduce((a, b) => a + b, 0);
         else if (cfg.operation === "AVG") perParent[pid] = nums.reduce((a, b) => a + b, 0) / nums.length;
