@@ -27,7 +27,7 @@ export default function RootLayout({ children }) {
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <header className="bg-blue-600 text-white px-4 sm:px-6 py-3 sm:py-4 shadow flex items-center justify-between gap-4">
           <a href="/" className="flex items-center">
-            <Image src="/logo-transparent.png" alt="EasyDB" width={154} height={122} className="h-12 sm:h-14 w-auto" priority />
+            <Image src="/logo-white.png" alt="EasyDB" width={154} height={122} className="h-12 sm:h-14 w-auto" priority />
           </a>
           <HeaderUser />
         </header>
