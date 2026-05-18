@@ -1441,18 +1441,24 @@ function DetalleSubgrid({ detalleField, parentId }) {
 
   // Campos a mostrar en la sub-grilla (excluye el back-ref)
   const visibleFields = childFields.filter((f) => f.id !== linkFieldId && f.type !== "detalle");
-  const hasDecimals = visibleFields.some((f) => f.type === "decimal");
+  const isSummable = (f) => f.type === "decimal" || f.type === "formula";
+  const hasTotals = visibleFields.some(isSummable);
 
   const sums = {};
   visibleFields.forEach((f) => {
-    if (f.type !== "decimal") return;
+    if (!isSummable(f)) return;
     let s = 0;
     items.forEach((it) => {
-      const n = parseFloat(it.values?.[f.id]);
+      const n = f.type === "formula" ? childCellNumeric(f, it) : parseFloat(it.values?.[f.id]);
       if (Number.isFinite(n)) s += n;
     });
     sums[f.id] = s;
   });
+
+  const formulaDecimals = (f) => {
+    try { const c = JSON.parse(f.options || "{}"); return Number.isFinite(c.decimals) ? c.decimals : 2; }
+    catch { return 2; }
+  };
 
   return (
     <div>
@@ -1536,13 +1542,15 @@ function DetalleSubgrid({ detalleField, parentId }) {
                 </tr>
               ))}
             </tbody>
-            {hasDecimals && (
+            {hasTotals && (
               <tfoot>
                 <tr className="bg-blue-50 font-bold">
                   <td className="border border-gray-200 px-2 py-1">Σ</td>
                   {visibleFields.map((f) => (
-                    <td key={f.id} className={`border border-gray-200 px-2 py-1 ${f.type === "decimal" ? "text-right font-mono text-blue-700" : ""}`}>
-                      {f.type === "decimal" ? formatDecimal(sums[f.id], getDecimals(f)) : ""}
+                    <td key={f.id} className={`border border-gray-200 px-2 py-1 ${isSummable(f) ? "text-right font-mono text-blue-700" : ""}`}>
+                      {isSummable(f)
+                        ? formatDecimal(sums[f.id], f.type === "decimal" ? getDecimals(f) : formulaDecimals(f))
+                        : ""}
                     </td>
                   ))}
                   <td className="border border-gray-200 px-2 py-1"></td>
