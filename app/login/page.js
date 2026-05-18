@@ -1,5 +1,6 @@
 import { signIn, auth } from "@/auth";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 
 export default async function LoginPage({ searchParams }) {
   const session = await auth();
@@ -12,7 +13,9 @@ export default async function LoginPage({ searchParams }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-8 max-w-md w-full text-center">
-        <h1 className="text-3xl font-bold mb-2">EasyDB</h1>
+        <div className="flex justify-center mb-4">
+          <Image src="/logo.png" alt="EasyDB" width={160} height={160} className="w-36 sm:w-40 h-auto" priority />
+        </div>
         <p className="text-gray-600 mb-8">Crea bases de datos sin saber programar.</p>
 
         <form
