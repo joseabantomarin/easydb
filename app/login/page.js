@@ -14,7 +14,7 @@ export default async function LoginPage({ searchParams }) {
     <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-8 max-w-md w-full text-center">
         <div className="flex justify-center mb-4">
-          <Image src="/logo.png" alt="EasyDB" width={160} height={160} className="w-36 sm:w-40 h-auto" priority />
+          <Image src="/logo.png" alt="EasyDB" width={240} height={190} className="w-48 sm:w-60 h-auto" priority />
         </div>
         <p className="text-gray-600 mb-8">Crea bases de datos sin saber programar.</p>
 
