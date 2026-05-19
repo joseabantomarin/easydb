@@ -41,9 +41,10 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'EasyDB',
-                style: TextStyle(fontSize: 36, fontWeight: FontWeight.w700),
+              Image.asset(
+                'assets/logo.png',
+                width: 220,
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 8),
               const Text('Tus bases de datos, en el bolsillo.'),
