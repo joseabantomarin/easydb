@@ -11,12 +11,16 @@ export default async function LoginPage({ searchParams }) {
   const callbackUrl = sp?.callbackUrl || "/";
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 gap-4">
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-8 max-w-md w-full text-center">
         <div className="flex justify-center mb-4">
           <Image src="/logo.png" alt="EasyDB" width={240} height={190} className="w-48 sm:w-60 h-auto" priority />
         </div>
-        <p className="text-gray-600 mb-8">Crea bases de datos sin saber programar.</p>
+        <p className="text-gray-700 mb-8 leading-relaxed">
+          Crea tus propias bases de datos sin saber programar. Organiza información,
+          define tablas con campos personalizados, vincula registros y haz cálculos
+          automáticos — todo desde la web o tu celular.
+        </p>
 
         <form
           action={async () => {
@@ -51,6 +55,32 @@ export default async function LoginPage({ searchParams }) {
           </a>
         </div>
       </div>
+
+      <div className="max-w-md w-full border-t-4 border-blue-600 bg-white rounded-xl shadow-sm p-6 text-center">
+        <h3 className="font-bold text-lg mb-2">¿Te gustó esta app?</h3>
+        <p className="text-gray-600 mb-5 leading-relaxed">
+          Desarrollo software a medida — webs, apps móviles, automatizaciones, IA.
+          Cuéntame tu idea y la convertimos en producto.
+        </p>
+        <a
+          href="mailto:joseabantomarin@gmail.com?subject=Cotizaci%C3%B3n%20de%20proyecto"
+          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-full px-6 py-3 transition"
+        >
+          Cotizar mi proyecto →
+        </a>
+        <p className="text-sm text-gray-500 mt-4">
+          José Abanto · Desarrollador full-stack
+        </p>
+      </div>
+
+      <a
+        href="https://openlinks.app"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="max-w-md w-full inline-flex items-center justify-center gap-2 border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-medium rounded-full px-6 py-3 transition"
+      >
+        Conoce más en openlinks.app ↗
+      </a>
     </div>
   );
 }
