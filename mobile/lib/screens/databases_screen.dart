@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../auth.dart';
+import '../support_button.dart';
 import '../ui.dart';
 import 'login_screen.dart';
 import 'tables_screen.dart';
@@ -110,6 +111,8 @@ class _DatabasesScreenState extends State<DatabasesScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Nueva'),
       ),
+      persistentFooterAlignment: AlignmentDirectional.center,
+      persistentFooterButtons: const [SupportButton()],
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List<DatabaseEntry>>(
