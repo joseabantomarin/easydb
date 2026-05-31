@@ -1,6 +1,7 @@
 import { signIn, auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import SupportButton from "@/app/support-button";
 
 export default async function LoginPage({ searchParams }) {
   const session = await auth();
@@ -81,6 +82,8 @@ export default async function LoginPage({ searchParams }) {
       >
         Conoce más en openlinks.app ↗
       </a>
+
+      <SupportButton />
     </div>
   );
 }
