@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { EditIcon, TrashIcon } from "@/app/icons";
+import SupportButton from "@/app/support-button";
 
 export default function Home() {
   const [databases, setDatabases] = useState([]);
@@ -239,6 +240,8 @@ export default function Home() {
         >
           Conoce más en openlinks.app ↗
         </a>
+
+        <SupportButton />
       </div>
     </div>
   );
